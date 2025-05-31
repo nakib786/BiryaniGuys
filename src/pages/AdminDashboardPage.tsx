@@ -41,6 +41,10 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const handleCloseTracking = () => {
+    setActiveTab('orders');
+  };
+
   return (
     <div className="container-custom py-10">
       <div className="flex justify-between items-center mb-8">
@@ -123,7 +127,7 @@ const AdminDashboardPage: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <LiveLocationControl />
+              <LiveLocationControl onClose={handleCloseTracking} />
             )}
           </div>
         )}

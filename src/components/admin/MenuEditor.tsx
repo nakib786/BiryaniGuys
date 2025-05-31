@@ -3,9 +3,11 @@ import { useMenu } from '../../hooks/useMenu';
 import type { MenuItem } from '../../hooks/useMenu';
 
 const MenuEditor: React.FC = () => {
-  const { menuItems, loading, error, addMenuItem, updateMenuItem, deleteMenuItem, toggleAvailability, setDailyInventory, markItemSold, resetInventoryCounts } = useMenu();
+  const { menuItems, loading, error, addMenuItem, updateMenuItem, deleteMenuItem, toggleAvailability, setDailyInventory, markItemSold, resetInventoryCounts, updateRemainingInventory } = useMenu();
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [remainingValues, setRemainingValues] = useState<Record<string, number>>({});
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -103,8 +105,48 @@ const MenuEditor: React.FC = () => {
     await toggleAvailability(id, !currentStatus);
   };
 
+  // Helper function to show notifications
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    
+    // Clear notification after 3 seconds
+    setTimeout(() => {
+      setNotification(null);
+    }, 3000);
+  };
+
   const handleSetInventory = async (id: string, quantity: number) => {
-    await setDailyInventory(id, quantity);
+    const success = await setDailyInventory(id, quantity);
+    if (success) {
+      const item = menuItems.find(item => item.id === id);
+      showNotification(`Inventory for ${item?.name || 'item'} set to ${quantity} and sold count reset`, 'success');
+    } else {
+      showNotification('Failed to set inventory', 'error');
+    }
+  };
+
+  const handleUpdateRemainingInventory = async (id: string, remainingQuantity: number) => {
+    const success = await updateRemainingInventory(id, remainingQuantity);
+    if (success) {
+      const item = menuItems.find(item => item.id === id);
+      const soldCount = item?.soldCount || 0;
+      const newTotalInventory = remainingQuantity + soldCount;
+      showNotification(`Remaining inventory for ${item?.name || 'item'} set to ${remainingQuantity} (Total: ${newTotalInventory})`, 'success');
+      // Reset the input field after successful update
+      setRemainingValues({
+        ...remainingValues,
+        [id]: remainingQuantity
+      });
+    } else {
+      showNotification('Failed to update remaining inventory', 'error');
+    }
+  };
+
+  const handleRemainingChange = (id: string, value: number) => {
+    setRemainingValues({
+      ...remainingValues,
+      [id]: value
+    });
   };
 
   const handleMarkSold = async (id: string) => {
@@ -127,6 +169,12 @@ const MenuEditor: React.FC = () => {
 
   return (
     <div className="p-4">
+      {notification && (
+        <div className={`mb-4 p-3 rounded-lg ${notification.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {notification.message}
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Menu Items</h2>
         <div className="flex gap-2">
@@ -353,20 +401,52 @@ const MenuEditor: React.FC = () => {
                   
                   {/* Inventory Management Buttons */}
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <div className="flex items-center gap-2 border rounded p-2 w-full">
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={item.dailyInventory || 0}
-                        onChange={(e) => handleSetInventory(item.id, parseInt(e.target.value) || 0)}
-                        className="w-16 p-1 border rounded text-center"
-                      />
-                      <button 
-                        onClick={() => handleSetInventory(item.id, (item.dailyInventory || 0))}
-                        className="btn btn-sm btn-outline"
-                      >
-                        Set Inventory
-                      </button>
+                    <div className="flex items-center gap-2 border rounded p-2 w-full bg-gray-50">
+                      <div className="flex-1">
+                        <div className="text-xs text-gray-500 mb-1">Set Daily Inventory + Reset Sold Count</div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            min="0"
+                            value={item.dailyInventory || 0}
+                            onChange={(e) => handleSetInventory(item.id, parseInt(e.target.value) || 0)}
+                            className="w-16 p-1 border rounded text-center"
+                          />
+                          <button 
+                            onClick={() => handleSetInventory(item.id, (item.dailyInventory || 0))}
+                            className="btn btn-sm btn-outline"
+                          >
+                            Set Inventory
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Update Remaining Inventory Section */}
+                    <div className="flex items-center gap-2 border rounded p-2 w-full bg-purple-50">
+                      <div className="flex-1">
+                        <div className="text-xs text-purple-500 mb-1">Enter Current Remaining Stock</div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            min="0"
+                            value={remainingValues[item.id] !== undefined ? remainingValues[item.id] : Math.max(0, (item.dailyInventory || 0) - (item.soldCount || 0))}
+                            onChange={(e) => handleRemainingChange(item.id, parseInt(e.target.value) || 0)}
+                            className="w-16 p-1 border rounded text-center"
+                          />
+                          <button 
+                            onClick={() => handleUpdateRemainingInventory(
+                              item.id, 
+                              remainingValues[item.id] !== undefined 
+                                ? remainingValues[item.id] 
+                                : Math.max(0, (item.dailyInventory || 0) - (item.soldCount || 0))
+                            )}
+                            className="btn btn-sm bg-purple-500 hover:bg-purple-600 text-white"
+                          >
+                            Update Remaining
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     
                     {(item.dailyInventory || 0) > 0 && (

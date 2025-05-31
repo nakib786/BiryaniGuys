@@ -155,6 +155,39 @@ export const useMenu = () => {
     }
   };
 
+  // Update inventory count without resetting sold count
+  const updateInventory = async (id: string, quantity: number) => {
+    try {
+      const itemRef = ref(db, `menu/${id}`);
+      await update(itemRef, { dailyInventory: quantity });
+      return true;
+    } catch (err) {
+      console.error('Error updating inventory:', err);
+      return false;
+    }
+  };
+
+  // Update inventory based on remaining stock
+  const updateRemainingInventory = async (id: string, remainingQuantity: number) => {
+    try {
+      // Get current item data
+      const item = menuItems.find(item => item.id === id);
+      if (!item) return false;
+      
+      // Calculate new inventory based on remaining + sold
+      const soldCount = item.soldCount || 0;
+      const newInventory = remainingQuantity + soldCount;
+      
+      // Update the inventory
+      const itemRef = ref(db, `menu/${id}`);
+      await update(itemRef, { dailyInventory: newInventory });
+      return true;
+    } catch (err) {
+      console.error('Error updating remaining inventory:', err);
+      return false;
+    }
+  };
+
   return {
     menuItems,
     loading,
@@ -165,6 +198,8 @@ export const useMenu = () => {
     toggleAvailability,
     setDailyInventory,
     markItemSold,
-    resetInventoryCounts
+    resetInventoryCounts,
+    updateInventory,
+    updateRemainingInventory
   };
 }; 

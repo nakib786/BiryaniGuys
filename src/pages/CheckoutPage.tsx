@@ -78,6 +78,47 @@ const CheckoutPage: React.FC = () => {
     setNotes(e.target.value);
   };
 
+  const handleIncreaseQuantity = (itemId: string) => {
+    const updatedCart = cart.map(item => 
+      item.id === itemId 
+        ? { ...item, quantity: item.quantity + 1 } 
+        : item
+    );
+    setCart(updatedCart);
+    // Update session storage
+    sessionStorage.setItem('cart', JSON.stringify(updatedCart));
+  };
+
+  const handleDecreaseQuantity = (itemId: string) => {
+    const updatedCart = cart.map(item => 
+      item.id === itemId && item.quantity > 1
+        ? { ...item, quantity: item.quantity - 1 } 
+        : item
+    ).filter(item => !(item.id === itemId && item.quantity === 1));
+    
+    setCart(updatedCart);
+    // Update session storage
+    sessionStorage.setItem('cart', JSON.stringify(updatedCart));
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    const updatedCart = cart.filter(item => item.id !== itemId);
+    setCart(updatedCart);
+    // Update session storage
+    sessionStorage.setItem('cart', JSON.stringify(updatedCart));
+    
+    // If cart is now empty, redirect to home
+    if (updatedCart.length === 0) {
+      navigate('/');
+    }
+  };
+
+  const handleAddMoreItems = () => {
+    // Update session storage before navigating away
+    sessionStorage.setItem('cart', JSON.stringify(cart));
+    navigate('/');
+  };
+
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -298,21 +339,50 @@ const CheckoutPage: React.FC = () => {
                   <>
                     <div className="divide-y">
                       {cart.map(item => (
-                        <div key={item.id} className="py-3 flex justify-between items-center">
-                          <div>
-                            <h4 className="font-medium">{item.name}</h4>
-                            <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                            {!item.available && (
-                              <p className="text-sm text-red-600">Out of stock</p>
-                            )}
-                            {item.dailyInventory && item.dailyInventory > 0 && (
-                              <p className="text-sm text-gray-600">
-                                {Math.max(0, (item.dailyInventory || 0) - (item.soldCount || 0))} remaining
-                              </p>
-                            )}
+                        <div key={item.id} className="py-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-medium">{item.name}</h4>
+                              <p className="text-sm text-gray-600">${item.price.toFixed(2)} each</p>
+                              {!item.available && (
+                                <p className="text-sm text-red-600">Out of stock</p>
+                              )}
+                              {item.dailyInventory && item.dailyInventory > 0 && (
+                                <p className="text-sm text-gray-600">
+                                  {Math.max(0, (item.dailyInventory || 0) - (item.soldCount || 0))} remaining
+                                </p>
+                              )}
+                            </div>
+                            <div className="font-medium">
+                              ${(item.price * item.quantity).toFixed(2)}
+                            </div>
                           </div>
-                          <div className="font-medium">
-                            ${(item.price * item.quantity).toFixed(2)}
+                          
+                          <div className="flex justify-between items-center">
+                            <button 
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="text-red-500 text-sm hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                            
+                            <div className="flex items-center">
+                              <button 
+                                onClick={() => handleDecreaseQuantity(item.id)}
+                                className="w-8 h-8 flex items-center justify-center border rounded-l-md bg-gray-100 hover:bg-gray-200"
+                              >
+                                -
+                              </button>
+                              <span className="w-10 h-8 flex items-center justify-center border-t border-b">
+                                {item.quantity}
+                              </span>
+                              <button 
+                                onClick={() => handleIncreaseQuantity(item.id)}
+                                className="w-8 h-8 flex items-center justify-center border rounded-r-md bg-gray-100 hover:bg-gray-200"
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -323,6 +393,22 @@ const CheckoutPage: React.FC = () => {
                         <span>Total:</span>
                         <span>${calculateTotal().toFixed(2)}</span>
                       </div>
+                      
+                      <button 
+                        onClick={handleAddMoreItems}
+                        className="btn btn-outline w-full mb-3"
+                      >
+                        Add More Items
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="btn btn-primary w-full"
+                        disabled={isSubmitting || cart.length === 0}
+                        onClick={handleSubmitOrder}
+                      >
+                        {isSubmitting ? 'Processing...' : 'Complete Order'}
+                      </button>
                     </div>
                   </>
                 )}
