@@ -134,3 +134,50 @@ This project includes:
 
 - Environment variables used in the client code must be prefixed with `VITE_` to be accessible in the browser
 - The project uses Vercel's serverless functions capabilities for backend operations
+
+# Background Location Tracking Enhancements
+
+To ensure reliable location tracking even when the device is locked or the browser is minimized, the following enhancements have been implemented:
+
+## Features Added
+
+1. **Wake Lock API Support**: Prevents the device from sleeping while location tracking is active
+   - Automatically reacquires the lock if released
+   - Gracefully falls back if the API is not supported
+
+2. **Web Worker Background Processing**: Maintains location tracking when browser tab is not active
+   - Creates a dedicated worker to continue location updates in the background
+   - Properly cleans up resources when tracking is stopped
+
+3. **Visibility Change Detection**: Automatically refreshes tracking when tab becomes visible again
+   - Detects when the browser tab regains focus
+   - Checks if tracking has stopped and restarts if necessary
+
+4. **User Notifications**: Informs users about best practices
+   - Displays notices about keeping the browser window open
+   - Provides guidance on device settings for optimal tracking
+
+## Usage
+
+No changes required to your existing code. The improvements work automatically with the existing location tracking API:
+
+```typescript
+// Starting location tracking
+await startPublicTracking('Driver Name');
+
+// Stopping location tracking
+await stopLiveTracking();
+```
+
+## Browser Compatibility
+
+- Wake Lock API: Chrome 84+, Edge 84+, Opera 70+
+- Web Workers: All modern browsers
+- For browsers without Wake Lock support, the app falls back to using standard intervals
+
+## Troubleshooting
+
+If location tracking still stops:
+1. Make sure "Background Activity" is enabled for the browser in device settings
+2. Disable battery optimization for the browser
+3. Keep the app in the foreground when possible

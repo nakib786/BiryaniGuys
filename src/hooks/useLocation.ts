@@ -10,6 +10,106 @@ interface LocationData {
   driverName?: string;
 }
 
+// Worker helper class to manage background tracking
+class LocationWorker {
+  private worker: Worker | null = null;
+  private workerUrl: string | null = null;
+  
+  createWorker(updateCallback: (lat: number, lng: number) => void): void {
+    if (this.worker) {
+      this.terminateWorker();
+    }
+    
+    try {
+      // Create worker
+      const workerCode = `
+        // BiryaniGuys Location Tracking Worker
+        // This worker helps maintain location tracking when the browser is minimized
+        
+        let timerId = null;
+        
+        // Start periodic location requests
+        function startTracking() {
+          if (timerId !== null) {
+            clearInterval(timerId);
+          }
+          
+          timerId = setInterval(() => {
+            self.postMessage('getLocation');
+          }, 1000);
+        }
+        
+        // Stop tracking
+        function stopTracking() {
+          if (timerId !== null) {
+            clearInterval(timerId);
+            timerId = null;
+          }
+        }
+        
+        // Handle messages from the main thread
+        self.onmessage = (e) => {
+          if (e.data === 'start') {
+            startTracking();
+          } else if (e.data === 'stop') {
+            stopTracking();
+          }
+        };
+        
+        // Start tracking immediately
+        startTracking();
+        
+        // Clean up when worker is terminated
+        self.addEventListener('beforeunload', () => {
+          stopTracking();
+        });
+      `;
+      
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      this.workerUrl = URL.createObjectURL(blob);
+      this.worker = new Worker(this.workerUrl);
+      
+      // Start the worker
+      this.worker.postMessage('start');
+      
+      // Set up message handler
+      this.worker.onmessage = () => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              updateCallback(latitude, longitude);
+            },
+            (err) => {
+              console.error('Worker geolocation error:', err);
+            },
+            { 
+              enableHighAccuracy: true,
+              maximumAge: 0,
+              timeout: 1000
+            }
+          );
+        }
+      };
+    } catch (err) {
+      console.error('Error creating worker:', err);
+    }
+  }
+  
+  terminateWorker(): void {
+    if (this.worker) {
+      this.worker.postMessage('stop');
+      this.worker.terminate();
+      this.worker = null;
+    }
+    
+    if (this.workerUrl) {
+      URL.revokeObjectURL(this.workerUrl);
+      this.workerUrl = null;
+    }
+  }
+}
+
 export const useLocation = (orderId?: string) => {
   const [deliveryLocation, setDeliveryLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,6 +117,62 @@ export const useLocation = (orderId?: string) => {
   const [isTracking, setIsTracking] = useState(false);
   const [watchId, setWatchId] = useState<number | null>(null);
   const locationUpdateInterval = useRef<number | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const locationWorkerRef = useRef<LocationWorker | null>(null);
+  
+  // Initialize the location worker
+  useEffect(() => {
+    locationWorkerRef.current = new LocationWorker();
+    
+    return () => {
+      if (locationWorkerRef.current) {
+        locationWorkerRef.current.terminateWorker();
+      }
+    };
+  }, []);
+  
+  // Request wake lock to keep device from sleeping
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        // Release any existing wake lock
+        if (wakeLockRef.current) {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+        }
+        
+        // Request a new wake lock
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.log('Wake Lock acquired');
+        
+        // Add a listener to reacquire the wake lock if it's released
+        wakeLockRef.current.addEventListener('release', () => {
+          console.log('Wake Lock released');
+          // Try to reacquire the wake lock
+          if (isTracking) {
+            requestWakeLock();
+          }
+        });
+      } else {
+        console.warn('Wake Lock API not supported in this browser');
+      }
+    } catch (err) {
+      console.error('Error acquiring Wake Lock:', err);
+    }
+  };
+  
+  // Release wake lock
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('Wake Lock released');
+      } catch (err) {
+        console.error('Error releasing Wake Lock:', err);
+      }
+    }
+  };
 
   // Subscribe to location updates for a specific order or public location
   useEffect(() => {
@@ -67,7 +223,7 @@ export const useLocation = (orderId?: string) => {
     };
   }, [orderId, deliveryLocation]);
 
-  // Clean up watch position and interval when component unmounts
+  // Clean up resources when component unmounts
   useEffect(() => {
     return () => {
       if (watchId !== null) {
@@ -77,8 +233,76 @@ export const useLocation = (orderId?: string) => {
         clearInterval(locationUpdateInterval.current);
         locationUpdateInterval.current = null;
       }
+      // Release wake lock on unmount
+      releaseWakeLock();
+      // Terminate worker
+      if (locationWorkerRef.current) {
+        locationWorkerRef.current.terminateWorker();
+      }
     };
   }, [watchId]);
+
+  // Add event listeners for page visibility change and app state
+  useEffect(() => {
+    // Handle visibility change
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isTracking) {
+        // Page is visible again, ensure tracking is still active
+        refreshLocationTracking();
+      }
+    };
+
+    // Handle page visibility change
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Handle page focus
+    window.addEventListener('focus', () => {
+      if (isTracking) {
+        refreshLocationTracking();
+      }
+    });
+    
+    // Handle beforeunload to clean up
+    window.addEventListener('beforeunload', releaseWakeLock);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', () => {});
+      window.removeEventListener('beforeunload', releaseWakeLock);
+    };
+  }, [isTracking]);
+
+  // Refresh location tracking if needed
+  const refreshLocationTracking = () => {
+    // Check if we're still tracking but location updates have stopped
+    if (isTracking && deliveryLocation) {
+      const timeSinceUpdate = Date.now() - deliveryLocation.timestamp;
+      
+      // If it's been more than 10 seconds since the last update, refresh tracking
+      if (timeSinceUpdate > 10000) {
+        console.log('Refreshing location tracking due to inactivity');
+        
+        // Clear existing tracking
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+          setWatchId(null);
+        }
+        
+        // Clear interval
+        if (locationUpdateInterval.current !== null) {
+          clearInterval(locationUpdateInterval.current);
+          locationUpdateInterval.current = null;
+        }
+        
+        // Restart tracking with existing driver name
+        if (orderId) {
+          startLiveTracking(deliveryLocation.driverName);
+        } else {
+          startPublicTracking(deliveryLocation.driverName);
+        }
+      }
+    }
+  };
 
   // Update the delivery location (for delivery personnel)
   const updateLocation = async (location: { latitude: number; longitude: number }, driverName?: string) => {
@@ -111,6 +335,9 @@ export const useLocation = (orderId?: string) => {
     if (!navigator.geolocation) return false;
     
     try {
+      // Acquire wake lock to prevent device from sleeping
+      await requestWakeLock();
+      
       // Get initial position
       let initialPosition = { 
         latitude: 50.6745, 
@@ -147,7 +374,7 @@ export const useLocation = (orderId?: string) => {
       
       setIsTracking(true);
       
-      // Use watchPosition for continuous updates
+      // Use watchPosition for continuous updates with more aggressive settings
       const id = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
@@ -161,34 +388,40 @@ export const useLocation = (orderId?: string) => {
         { 
           enableHighAccuracy: true,
           maximumAge: 0, // Don't use cached positions
-          timeout: 5000 // 5 second timeout
+          timeout: 5000, // 5 second timeout
         }
       );
       
       setWatchId(id);
       
-      // Start frequent updates every 1 second
-      // This ensures we get location updates even if the device's location doesn't change
-      if (locationUpdateInterval.current !== null) {
-        clearInterval(locationUpdateInterval.current);
+      // Start the worker for background tracking
+      if (window.Worker && locationWorkerRef.current) {
+        locationWorkerRef.current.createWorker((latitude, longitude) => {
+          updateLocation({ latitude, longitude }, driverName);
+        });
+      } else {
+        // Fallback to standard interval if Workers not supported
+        if (locationUpdateInterval.current !== null) {
+          clearInterval(locationUpdateInterval.current);
+        }
+        
+        locationUpdateInterval.current = window.setInterval(() => {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              updateLocation({ latitude, longitude }, driverName);
+            },
+            (err) => {
+              console.error('Periodic update geolocation error:', err);
+            },
+            { 
+              enableHighAccuracy: true,
+              maximumAge: 0,
+              timeout: 1000
+            }
+          );
+        }, 1000); // Update every 1 second
       }
-      
-      locationUpdateInterval.current = window.setInterval(() => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            updateLocation({ latitude, longitude }, driverName);
-          },
-          (err) => {
-            console.error('Periodic update geolocation error:', err);
-          },
-          { 
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 1000
-          }
-        );
-      }, 1000); // Update every 1 second
       
       return true;
     } catch (err) {
@@ -202,6 +435,9 @@ export const useLocation = (orderId?: string) => {
     if (!orderId || !navigator.geolocation) return false;
     
     try {
+      // Acquire wake lock to prevent device from sleeping
+      await requestWakeLock();
+      
       // Get initial position
       let initialPosition = { 
         latitude: 50.6745, 
@@ -257,28 +493,34 @@ export const useLocation = (orderId?: string) => {
       
       setWatchId(id);
       
-      // Start frequent updates every 1 second
-      // This ensures we get location updates even if the device's location doesn't change
-      if (locationUpdateInterval.current !== null) {
-        clearInterval(locationUpdateInterval.current);
+      // Start the worker for background tracking
+      if (window.Worker && locationWorkerRef.current) {
+        locationWorkerRef.current.createWorker((latitude, longitude) => {
+          updateLocation({ latitude, longitude }, driverName);
+        });
+      } else {
+        // Fallback to standard interval if Workers not supported
+        if (locationUpdateInterval.current !== null) {
+          clearInterval(locationUpdateInterval.current);
+        }
+        
+        locationUpdateInterval.current = window.setInterval(() => {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              updateLocation({ latitude, longitude }, driverName);
+            },
+            (err) => {
+              console.error('Periodic update geolocation error:', err);
+            },
+            { 
+              enableHighAccuracy: true,
+              maximumAge: 0,
+              timeout: 1000
+            }
+          );
+        }, 1000); // Update every 1 second
       }
-      
-      locationUpdateInterval.current = window.setInterval(() => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            updateLocation({ latitude, longitude }, driverName);
-          },
-          (err) => {
-            console.error('Periodic update geolocation error:', err);
-          },
-          { 
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 1000
-          }
-        );
-      }, 1000); // Update every 1 second
       
       return true;
     } catch (err) {
@@ -290,6 +532,9 @@ export const useLocation = (orderId?: string) => {
   // Stop live location tracking
   const stopLiveTracking = async () => {
     try {
+      // Release wake lock
+      await releaseWakeLock();
+      
       // Clear the watch position if it exists
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
@@ -300,6 +545,11 @@ export const useLocation = (orderId?: string) => {
       if (locationUpdateInterval.current !== null) {
         clearInterval(locationUpdateInterval.current);
         locationUpdateInterval.current = null;
+      }
+      
+      // Stop worker
+      if (locationWorkerRef.current) {
+        locationWorkerRef.current.terminateWorker();
       }
       
       // Update tracking state in the database

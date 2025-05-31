@@ -1,16 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/ui/Header';
 import Footer from '../components/ui/Footer';
 import LiveMap from '../components/map/LiveMap';
 import { useLocation } from '../hooks/useLocation';
 import { Link } from 'react-router-dom';
+import { Alert, Snackbar, Typography } from '@mui/material';
+import InfoIcon from '@mui/icons-material/Info';
 
 const PublicTrackingPage: React.FC = () => {
   const { deliveryLocation, loading } = useLocation(); // Use without orderId for public tracking
   const [defaultLocation] = useState<[number, number]>([40.7128, -74.0060]); // Default to NYC
+  const [showTrackingInfo, setShowTrackingInfo] = useState<boolean>(false);
 
   // Check if there's an active public delivery tracking
   const isTrackingActive = !!deliveryLocation?.isTracking;
+
+  // Show tracking info when active tracking is detected
+  useEffect(() => {
+    if (isTrackingActive) {
+      setShowTrackingInfo(true);
+      // Auto-hide after 15 seconds
+      const timer = setTimeout(() => {
+        setShowTrackingInfo(false);
+      }, 15000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTrackingActive]);
 
   // Get delivery coordinates if available
   const getDeliveryCoordinates = (): [number, number] | undefined => {
@@ -39,6 +55,26 @@ const PublicTrackingPage: React.FC = () => {
       
       <main className="container-custom py-10">
         <h1 className="text-center text-primary mb-8">Live Delivery Tracking</h1>
+        
+        <Snackbar 
+          open={showTrackingInfo && isTrackingActive} 
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          onClose={() => setShowTrackingInfo(false)}
+        >
+          <Alert 
+            severity="info" 
+            icon={<InfoIcon />}
+            onClose={() => setShowTrackingInfo(false)}
+            sx={{ width: '100%' }}
+          >
+            <Typography variant="subtitle1" fontWeight="bold">
+              For best tracking experience
+            </Typography>
+            <Typography variant="body2">
+              To ensure reliable location tracking, please keep this window open and your device unlocked.
+            </Typography>
+          </Alert>
+        </Snackbar>
         
         <div className="card mb-8">
           <div className="bg-primary text-white p-4 rounded-t-lg flex justify-between items-center">
@@ -77,6 +113,10 @@ const PublicTrackingPage: React.FC = () => {
                     Last update: {formatUpdateTime(deliveryLocation.timestamp)}
                   </p>
                 )}
+                <p className="text-blue-600 text-sm mt-3 border-t border-green-200 pt-2">
+                  <InfoIcon style={{ fontSize: '1rem', verticalAlign: 'middle', marginRight: '4px' }} />
+                  For reliable tracking, keep this browser window open and your device unlocked.
+                </p>
               </div>
               
               <div className="h-[500px] rounded-lg overflow-hidden shadow-md">

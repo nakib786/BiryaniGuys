@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from '../../hooks/useLocation';
-import LiveMap from '../map/LiveMap';
+import { Button, Alert, Snackbar, Typography, Box, Paper, Container } from '@mui/material';
+import InfoIcon from '@mui/icons-material/Info';
+import StopIcon from '@mui/icons-material/Stop';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 interface LiveLocationControlProps {
-  onClose?: () => void;
+  onClose: () => void;
 }
 
 const LiveLocationControl: React.FC<LiveLocationControlProps> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [customerLocation] = useState<[number, number]>([51.505, -0.09]); // Default location (London)
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [isStoppingTracking, setIsStoppingTracking] = useState<boolean>(false);
+  const [showBackgroundInfo, setShowBackgroundInfo] = useState<boolean>(false);
   
   // Use the location hook for public tracking
   const { 
@@ -22,6 +25,19 @@ const LiveLocationControl: React.FC<LiveLocationControlProps> = ({ onClose }) =>
     getPublicLocation,
     updateLocation
   } = useLocation();
+  
+  // Show background tracking info when starting tracking
+  useEffect(() => {
+    if (isTracking) {
+      setShowBackgroundInfo(true);
+      // Auto-hide after 15 seconds
+      const timer = setTimeout(() => {
+        setShowBackgroundInfo(false);
+      }, 15000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTracking]);
   
   // Check if public location is active on mount
   useEffect(() => {
@@ -68,6 +84,9 @@ const LiveLocationControl: React.FC<LiveLocationControlProps> = ({ onClose }) =>
           const success = await startPublicTracking('Delivery Driver');
           if (!success) {
             setError('Failed to start location tracking. Please check location permissions.');
+          } else {
+            // Show background tracking info
+            setShowBackgroundInfo(true);
           }
         },
         (err) => {
@@ -112,102 +131,99 @@ const LiveLocationControl: React.FC<LiveLocationControlProps> = ({ onClose }) =>
   };
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-md">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Live Location Control</h2>
-        {onClose && (
-          <button onClick={onClose} className="btn btn-sm btn-circle">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Typography variant="h4" component="h2" gutterBottom align="center">
+        Live Location Tracking
+      </Typography>
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          <span className="font-bold">Error:</span> {error}
-        </div>
+        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+          {error}
+        </Alert>
       )}
       
       {successMessage && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          <span className="font-bold">Success:</span> {successMessage}
-        </div>
+        <Alert severity="success" onClose={() => setSuccessMessage(null)} sx={{ mb: 2 }}>
+          {successMessage}
+        </Alert>
       )}
       
-      <div className="mb-4">
-        <div className="flex justify-center mb-6">
-          {isTracking ? (
-            <button
+      <Snackbar 
+        open={showBackgroundInfo} 
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        onClose={() => setShowBackgroundInfo(false)}
+      >
+        <Alert 
+          severity="info" 
+          icon={<InfoIcon />}
+          onClose={() => setShowBackgroundInfo(false)}
+          sx={{ width: '100%' }}
+        >
+          <Typography variant="subtitle1" fontWeight="bold">
+            Keep this window open and visible for reliable tracking
+          </Typography>
+          <Typography variant="body2">
+            For best location tracking performance:
+            <ul>
+              <li>Keep this browser window open</li>
+              <li>Keep your device unlocked</li>
+              <li>Disable battery optimization for this browser</li>
+            </ul>
+          </Typography>
+        </Alert>
+      </Snackbar>
+      
+      <Box display="flex" justifyContent="center" mb={4}>
+        {isTracking ? (
+          <Box width="100%" maxWidth="md">
+            <Paper elevation={3} sx={{ p: 2, mb: 2, bgcolor: '#f0f8ff' }}>
+              <Box display="flex" alignItems="center" mb={1}>
+                <InfoIcon color="info" sx={{ mr: 1 }} />
+                <Typography variant="subtitle1">
+                  Location tracking is active
+                </Typography>
+              </Box>
+              <Typography variant="body2">
+                Last updated: {getTimeSinceUpdate()}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" mt={1}>
+                For reliable tracking, keep this window open and your device unlocked.
+              </Typography>
+            </Paper>
+            
+            <Button 
+              variant="contained" 
+              color="secondary" 
               onClick={handleStopTracking}
-              className="btn btn-danger btn-lg w-full max-w-md flex justify-center items-center gap-2"
               disabled={isStoppingTracking}
+              fullWidth
+              startIcon={<StopIcon />}
+              size="large"
             >
-              {isStoppingTracking ? (
-                <>
-                  <div className="animate-spin h-5 w-5 border-2 border-white rounded-full border-t-transparent"></div>
-                  <span>Stopping...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Stop Live Tracking
-                </>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={handleStartTracking}
-              className="btn btn-primary btn-lg w-full max-w-md"
-            >
-              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-              Start Live Tracking
-            </button>
-          )}
-        </div>
-        
-        <div>
-          <h3 className="text-lg font-medium mb-2">Live Map</h3>
-          
-          {isTracking && (
-            <div className="flex items-center mb-2 bg-green-50 p-2 rounded">
-              <div className="animate-pulse w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-sm text-green-700">
-                Location broadcasting live - Updated {getTimeSinceUpdate()}
-              </span>
-            </div>
-          )}
-          
-          <LiveMap
-            customerLocation={customerLocation}
-            deliveryLocation={deliveryLocation ? [deliveryLocation.latitude, deliveryLocation.longitude] : undefined}
-            orderId="public"
-            driverName="Delivery Driver"
-            autoCenterOnDriver={true}
-            timestamp={deliveryLocation?.timestamp}
-          />
-          
-          {isTracking && deliveryLocation && (
-            <div className="mt-2 text-sm">
-              <p>
-                <strong>Last update:</strong> {new Date(deliveryLocation.timestamp).toLocaleTimeString()}
-              </p>
-              <p>
-                <strong>Coordinates:</strong> {deliveryLocation.latitude.toFixed(6)}, {deliveryLocation.longitude.toFixed(6)}
-              </p>
-              <p className="text-xs text-green-600 mt-1">
-                <strong>Update frequency:</strong> Every 1 second
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+              {isStoppingTracking ? 'Stopping...' : 'Stop Tracking'}
+            </Button>
+          </Box>
+        ) : (
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleStartTracking}
+            fullWidth
+            startIcon={<PlayArrowIcon />}
+            size="large"
+            sx={{ maxWidth: "md" }}
+          >
+            Start Live Tracking
+          </Button>
+        )}
+      </Box>
+      
+      <Box display="flex" justifyContent="center" mt={4}>
+        <Button variant="outlined" onClick={onClose}>
+          Close
+        </Button>
+      </Box>
+    </Container>
   );
 };
 
