@@ -49,17 +49,22 @@ export const seedDatabase = async (): Promise<void> => {
     if (!snapshot.exists()) {
       console.log('Seeding database with initial menu items...');
       
-      // Add each menu item with a specific key
-      for (let i = 0; i < initialMenuItems.length; i++) {
-        const itemRef = ref(db, `menu/item${i + 1}`);
-        await set(itemRef, initialMenuItems[i]);
+      try {
+        // Add each menu item with a specific key
+        for (let i = 0; i < initialMenuItems.length; i++) {
+          const itemRef = ref(db, `menu/item${i + 1}`);
+          await set(itemRef, initialMenuItems[i]);
+        }
+        
+        console.log('Database seeded successfully!');
+      } catch (error) {
+        console.error('Error writing to database:', error);
       }
-      
-      console.log('Database seeded successfully!');
     } else {
       console.log('Database already contains menu items. Skipping seed operation.');
     }
   } catch (error) {
-    console.error('Error seeding database:', error);
+    console.error('Error checking database:', error);
+    // Continue execution even if seeding fails
   }
 }; 

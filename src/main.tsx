@@ -5,10 +5,18 @@ import './App.css'
 import App from './App.tsx'
 import { seedDatabase } from './utils/seedDatabase'
 
-// Seed the database with initial data if needed
-seedDatabase().catch(console.error);
+// Try to seed the database but don't block app rendering if it fails
+seedDatabase().catch(error => {
+  console.error("Failed to seed database, but continuing app initialization:", error);
+});
 
-createRoot(document.getElementById('root')!).render(
+// Find the root element - add error handling
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error('Root element not found');
+}
+
+createRoot(rootElement).render(
   <StrictMode>
     <App />
   </StrictMode>,

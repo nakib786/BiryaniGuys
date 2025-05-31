@@ -10,6 +10,7 @@ import { auth } from "../utils/firebase";
 type AuthContextType = {
   currentUser: User | null;
   loading: boolean;
+  error: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -27,34 +28,63 @@ export const useAuth = () => {
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
+    let unsubscribe: () => void;
+    try {
+      unsubscribe = onAuthStateChanged(auth, (user) => {
+        setCurrentUser(user);
+        setLoading(false);
+      }, (error) => {
+        console.error("Auth state change error:", error);
+        setError(error.message);
+        setLoading(false);
+      });
+    } catch (err) {
+      console.error("Failed to setup auth state listener:", err);
       setLoading(false);
-    });
+      setError(err instanceof Error ? err.message : "Unknown auth error");
+    }
 
-    return unsubscribe;
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+      setError(null);
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      console.error("Login error:", err);
+      setError(err instanceof Error ? err.message : "Failed to login");
+      throw err;
+    }
   };
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+      setError(null);
+      await signOut(auth);
+    } catch (err) {
+      console.error("Logout error:", err);
+      setError(err instanceof Error ? err.message : "Failed to logout");
+      throw err;
+    }
   };
 
   const value = {
     currentUser,
     loading,
+    error,
     login,
     logout,
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 } 

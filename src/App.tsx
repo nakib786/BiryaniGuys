@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import AuthProvider from "./context/AuthContext";
-import { useAuth } from "./context/AuthContext";
+import AuthProvider, { useAuth } from "./context/AuthContext";
 import HomePage from "./pages/HomePage";
 import CheckoutPage from "./pages/CheckoutPage";
 import TrackOrderPage from "./pages/TrackOrderPage";
@@ -12,7 +11,12 @@ import './App.css';
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
+  
+  // Show loading indicator while auth state is being determined
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
   
   if (!currentUser) {
     return <Navigate to="/admin" />;
