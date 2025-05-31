@@ -49,6 +49,31 @@ VITE_TWILIO_AUTH_TOKEN=your-twilio-auth-token
 
 Click "Deploy" and wait for the deployment to complete.
 
+## Firebase Compatibility with Vite and Vercel
+
+If you encounter build errors related to Firebase resolution, ensure:
+
+1. You're using a compatible Firebase version (10.9.0 or later)
+2. Your vite.config.ts includes proper module resolution for Firebase:
+   ```typescript
+   resolve: {
+     alias: {
+       '@': resolve(__dirname, './src'),
+       'firebase/app': 'firebase/app/dist/index.mjs',
+       'firebase/auth': 'firebase/auth/dist/index.mjs',
+       'firebase/firestore': 'firebase/firestore/dist/index.mjs',
+       // Add other Firebase modules you use
+     }
+   }
+   ```
+3. You have an .npmrc file with:
+   ```
+   legacy-peer-deps=true
+   shamefully-hoist=true
+   ```
+
+These configurations help Vite properly resolve Firebase's ESM modules during the build process.
+
 ## Environment Setup for Local Development
 
 To use environment variables locally, create a `.env.local` file in the project root with the same variables:

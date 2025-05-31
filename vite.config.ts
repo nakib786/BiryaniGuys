@@ -8,6 +8,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      'firebase/app': 'firebase/app/dist/index.mjs',
+      'firebase/auth': 'firebase/auth/dist/index.mjs',
+      'firebase/firestore': 'firebase/firestore/dist/index.mjs',
+      'firebase/storage': 'firebase/storage/dist/index.mjs',
+      'firebase/functions': 'firebase/functions/dist/index.mjs',
+      'firebase/database': 'firebase/database/dist/index.mjs',
     },
   },
   build: {
@@ -16,11 +22,22 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          firebase: ['firebase'],
-        },
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('firebase')) return 'firebase';
+            if (id.includes('react')) return 'vendor';
+            return 'vendor'; // all other node_modules
+          }
+        }
       },
+    },
+    commonjsOptions: {
+      include: [/node_modules/],
+    },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'es2020',
     },
   },
 })
