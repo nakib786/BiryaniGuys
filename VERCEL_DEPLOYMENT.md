@@ -31,19 +31,16 @@ In the project configuration screen:
 In the "Environment Variables" section, add the following variables:
 
 ```
-# Firebase Environment Variables - USE THESE EXACT VALUES
-VITE_FIREBASE_API_KEY=AIzaSyBOYwkYywzv834O4rIPj7R0oXv_IsZO9rc
-VITE_FIREBASE_AUTH_DOMAIN=biryaniguys-9a6cb.firebaseapp.com
-VITE_FIREBASE_DATABASE_URL=https://biryaniguys-9a6cb-default-rtdb.firebaseio.com
-VITE_FIREBASE_PROJECT_ID=biryaniguys-9a6cb
-VITE_FIREBASE_STORAGE_BUCKET=biryaniguys-9a6cb.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=492595947342
-VITE_FIREBASE_APP_ID=1:492595947342:web:90b13b8a7673c77cfbe01f
-VITE_FIREBASE_MEASUREMENT_ID=G-EXMYLXFJ3F
+VITE_API_KEY=your-firebase-api-key
+VITE_AUTH_DOMAIN=your-firebase-auth-domain
+VITE_PROJECT_ID=your-firebase-project-id
+VITE_STORAGE_BUCKET=your-firebase-storage-bucket
+VITE_MESSAGING_SENDER_ID=your-firebase-messaging-sender-id
+VITE_APP_ID=your-firebase-app-id
 
-# If using Twilio (add your own values)
-# VITE_TWILIO_SID=your-twilio-sid
-# VITE_TWILIO_AUTH_TOKEN=your-twilio-auth-token
+# If using Twilio
+VITE_TWILIO_SID=your-twilio-sid
+VITE_TWILIO_AUTH_TOKEN=your-twilio-auth-token
 ```
 
 > **Note**: All client-side environment variables must be prefixed with `VITE_` to be accessible in your React code.
@@ -57,56 +54,38 @@ Click "Deploy" and wait for the deployment to complete.
 To use environment variables locally, create a `.env.local` file in the project root with the same variables:
 
 ```
-# Firebase Environment Variables - USE THESE EXACT VALUES
-VITE_FIREBASE_API_KEY=AIzaSyBOYwkYywzv834O4rIPj7R0oXv_IsZO9rc
-VITE_FIREBASE_AUTH_DOMAIN=biryaniguys-9a6cb.firebaseapp.com
-VITE_FIREBASE_DATABASE_URL=https://biryaniguys-9a6cb-default-rtdb.firebaseio.com
-VITE_FIREBASE_PROJECT_ID=biryaniguys-9a6cb
-VITE_FIREBASE_STORAGE_BUCKET=biryaniguys-9a6cb.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=492595947342
-VITE_FIREBASE_APP_ID=1:492595947342:web:90b13b8a7673c77cfbe01f
-VITE_FIREBASE_MEASUREMENT_ID=G-EXMYLXFJ3F
+VITE_API_KEY=your-firebase-api-key
+VITE_AUTH_DOMAIN=your-firebase-auth-domain
+VITE_PROJECT_ID=your-firebase-project-id
+VITE_STORAGE_BUCKET=your-firebase-storage-bucket
+VITE_MESSAGING_SENDER_ID=your-firebase-messaging-sender-id
+VITE_APP_ID=your-firebase-app-id
 
-# If using Twilio (add your own values)
-# VITE_TWILIO_SID=your-twilio-sid
-# VITE_TWILIO_AUTH_TOKEN=your-twilio-auth-token
+# If using Twilio
+VITE_TWILIO_SID=your-twilio-sid
+VITE_TWILIO_AUTH_TOKEN=your-twilio-auth-token
 ```
 
 This file is automatically ignored by Git (via `.gitignore`).
 
 ## Using Environment Variables in Your Code
 
-Now you'll need to update your Firebase configuration to use environment variables. Modify `src/utils/firebase.ts`:
+In your React components, access environment variables like this:
 
 ```typescript
-// Import the functions you need from the SDKs you need
+// Example Firebase initialization
 import { initializeApp } from 'firebase/app';
-import { getAnalytics } from 'firebase/analytics';
-import { getDatabase } from 'firebase/database';
-import { getAuth } from 'firebase/auth';
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_API_KEY,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_APP_ID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const analytics = getAnalytics(app);
-
-// Get Firebase services
-export const db = getDatabase(app);
-export const auth = getAuth(app);
 ```
 
 ## Vercel CLI for Advanced Users
@@ -123,7 +102,7 @@ For advanced deployment options, you can use the Vercel CLI:
 ### Environment Variables Not Working
 
 - Verify that all environment variables are prefixed with `VITE_`
-- Check that your code references them using `import.meta.env.VITE_FIREBASE_VARIABLE_NAME`
+- Check that your code references them using `import.meta.env.VITE_VARIABLE_NAME`
 - Try redeploying after updating environment variables
 
 ### Build Failures
