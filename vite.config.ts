@@ -8,13 +8,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
-      'firebase/app': 'firebase/app/dist/index.mjs',
-      'firebase/auth': 'firebase/auth/dist/index.mjs',
-      'firebase/database': 'firebase/database/dist/index.mjs',
-      'firebase/analytics': 'firebase/analytics/dist/index.mjs',
-      'firebase/firestore': 'firebase/firestore/dist/index.mjs',
-      'firebase/storage': 'firebase/storage/dist/index.mjs',
-      'firebase/functions': 'firebase/functions/dist/index.mjs',
     },
   },
   build: {
