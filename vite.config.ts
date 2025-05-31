@@ -1,19 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import { resolve } from 'path'
+import firebaseModuleResolver from './firebase-plugin'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), firebaseModuleResolver()],
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
-      'firebase/app': 'firebase/app/dist/index.mjs',
-      'firebase/auth': 'firebase/auth/dist/index.mjs',
-      'firebase/firestore': 'firebase/firestore/dist/index.mjs',
-      'firebase/storage': 'firebase/storage/dist/index.mjs',
-      'firebase/functions': 'firebase/functions/dist/index.mjs',
-      'firebase/database': 'firebase/database/dist/index.mjs',
     },
   },
   build: {
@@ -21,6 +16,15 @@ export default defineConfig({
     minify: true,
     sourcemap: false,
     rollupOptions: {
+      external: [
+        'firebase/app',
+        'firebase/auth',
+        'firebase/database',
+        'firebase/analytics',
+        'firebase/firestore',
+        'firebase/storage',
+        'firebase/functions',
+      ],
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
@@ -39,5 +43,6 @@ export default defineConfig({
     esbuildOptions: {
       target: 'es2020',
     },
+    include: ['firebase/app', 'firebase/auth', 'firebase/database', 'firebase/analytics'],
   },
 })
